@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solar Monitor | ERC, Dharan</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    
+    <style>
+        /* --- THEME VARIABLES (Based on your Screenshot) --- */
+        :root {
+            /* Dark Theme Colors (Default) */
+            --bg-body: #111827;       /* Very dark blue/grey */
+            --bg-sidebar: #0f172a;    /* Slightly darker for sidebar */
+            --bg-card: #1f2937;       /* Card background */
+            --bg-card-hover: #374151;
+            
+            --accent-primary: #3b82f6; /* The vibrant blue from the image */
+            --accent-success: #10b981;
+            --accent-warning: #f59e0b;
+            
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+            
+            --border-color: #374151;
+            --radius: 12px;
+        }
+
+        /* Light Theme Override */
+        body.light-mode {
+            --bg-body: #f3f4f6;
+            --bg-sidebar: #ffffff;
+            --bg-card: #ffffff;
+            --bg-card-hover: #f9fafb;
+            --text-main: #111827;
+            --text-muted: #6b7280;
+            --border-color: #e5e7eb;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', system-ui, sans-serif; }
+
+        body {
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            height: 100vh;
+            display: flex;
+            overflow: hidden; /* Prevent body scroll, handle in main */
+            transition: background-color 0.3s;
+        }
+
+        /* --- SIDEBAR (Left Panel) --- */
+        aside {
+            width: 260px;
+            background-color: var(--bg-sidebar);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            transition: transform 0.3s ease;
+            z-index: 100;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 40px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .logo-circle {
+            width: 40px; height: 40px;
+            background: var(--accent-primary);
+            border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: bold; color: white;
+            overflow: hidden;
+        }
+        .logo-circle img { width: 100%; height: 100%; object-fit: cover; }
+
+        .brand-text h2 { font-size: 1rem; font-weight: 700; }
+        .brand-text p { font-size: 0.75rem; color: var(--text-muted); }
+
+        .nav-menu { list-style: none; flex: 1; }
+        .nav-item {
+            display: flex; align-items: center; gap: 12px;
+            padding: 12px 16px;
+            margin-bottom: 8px;
+            border-radius: 8px;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 500;
+        }
+        .nav-item:hover { background-color: rgba(59, 130, 246, 0.1); color: var(--text-main); }
+        
+        /* Active State (Blue Button Style) */
+        .nav-item.active {
+            background-color: var(--accent-primary);
+            color: white;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+        }
+
+        /* Quick Stats in Sidebar (Like your image) */
+        .sidebar-stats {
+            margin-top: auto;
+            background: rgba(0,0,0,0.2);
+            padding: 15px;
+            border-radius: var(--radius);
+        }
+        .stat-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 0.85rem; }
+        .stat-label { color: var(--text-muted); }
+        .stat-val { font-weight: 600; color: var(--text-main); }
+
+        /* --- MAIN CONTENT (Right Panel) --- */
+        main {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Top Header */
+        header {
+            padding: 20px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+            background: var(--bg-body);
+            position: sticky; top: 0; z-index: 50;
+        }
+
+        .header-title h1 { font-size: 1.5rem; font-weight: 600; }
+        .header-title span { color: var(--text-muted); font-size: 0.9rem; }
+
+        .header-actions { display: flex; align-items: center; gap: 20px; }
+        
+        /* Date/Time Pill */
+        .datetime-pill {
+            background: var(--bg-card);
+            padding: 8px 16px;
+            border-radius: 50px;
+            border: 1px solid var(--border-color);
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            display: flex; align-items: center; gap: 8px;
+        }
+
+        /* Theme Toggle */
+        .icon-btn {
+            width: 40px; height: 40px;
+            border-radius: 50%;
+            border: 1px solid var(--border-color);
+            background: var(--bg-card);
+            color: var(--text-muted);
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .icon-btn:hover { background: var(--bg-card-hover); color: var(--text-main); }
+
+        /* --- DASHBOARD CONTENT --- */
+        .dashboard-container {
+            padding: 30px;
+            max-width: 1600px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        /* KPI Grid */
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .kpi-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            padding: 20px;
+            position: relative;
+            transition: transform 0.2s;
+        }
+        .kpi-card:hover { transform: translateY(-3px); border-color: var(--accent-primary); }
+
+        .kpi-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .kpi-title { color: var(--text-muted); font-size: 0.9rem; font-weight: 500; }
+        .kpi-icon { 
+            width: 36px; height: 36px; 
+            border-radius: 8px; 
+            background: rgba(59, 130, 246, 0.1); 
+            color: var(--accent-primary);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.2rem;
+        }
+
+        .kpi-value { font-size: 1.8rem; font-weight: 700; margin-bottom: 5px; }
+        .kpi-sub { font-size: 0.8rem; display: flex; align-items: center; gap: 5px; }
+        .trend-up { color: var(--accent-success); }
+        .trend-down { color: var(--accent-warning); }
+
+        /* Charts Section */
+        .charts-row {
+            display: grid;
+            grid-template-columns: 2fr 1fr; /* 2/3 Width for Line chart, 1/3 for Pie */
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .chart-box {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            padding: 20px;
+            min-height: 400px;
+            display: flex; flex-direction: column;
+        }
+
+        .chart-header { display: flex; justify-content: space-between; margin-bottom: 20px; }
+        .chart-title h3 { font-size: 1.1rem; font-weight: 600; }
+        .chart-title p { font-size: 0.8rem; color: var(--text-muted); }
+        
+        .chart-canvas-wrapper { flex: 1; position: relative; width: 100%; }
+
+        /* Footer */
+        footer {
+            margin-top: auto;
+            padding: 20px 30px;
+            border-top: 1px solid var(--border-color);
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+        }
+
+        /* Mobile Responsive */
+        @media (max-width: 1024px) {
+            .charts-row { grid-template-columns: 1fr; }
+        }
+
+        @media (max-width: 768px) {
+            aside { position: fixed; left: -260px; height: 100%; }
+            aside.open { transform: translateX(260px); }
+            .header-title h1 { font-size: 1.2rem; }
+            .datetime-pill { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+    <aside id="sidebar">
+        <div class="brand">
+            <div class="logo-circle">
+                <img src="logo.png" alt="ERC" onerror="this.style.display='none'">
+                <span id="logo-text">ERC</span>
+            </div>
+            <div class="brand-text">
+                <h2>Solar Monitor</h2>
+                <p>ERC, Dharan</p>
+            </div>
+        </div>
+
+        <ul class="nav-menu">
+            <li class="nav-item active">
+                <i class="ph ph-squares-four"></i> Dashboard
+            </li>
+            <li class="nav-item">
+                <i class="ph ph-chart-line-up"></i> Analytics
+            </li>
+            <li class="nav-item">
+                <i class="ph ph-sliders-horizontal"></i> Control Center
+            </li>
+            <li class="nav-item">
+                <i class="ph ph-gear"></i> Settings
+            </li>
+        </ul>
+
+        <div class="sidebar-stats">
+            <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); margin-bottom: 10px;">Quick Stats</div>
+            <div class="stat-row">
+                <span class="stat-label"><i class="ph ph-sun"></i> Solar Input</span>
+                <span class="stat-val" id="sb-solar">0 kW</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label"><i class="ph ph-battery-charging"></i> Battery</span>
+                <span class="stat-val" id="sb-batt">85%</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label"><i class="ph ph-lightning"></i> Grid Load</span>
+                <span class="stat-val" id="sb-load">0 kW</span>
+            </div>
+            <div style="margin-top: 10px; font-size: 0.75rem; color: var(--accent-success); display: flex; align-items: center; gap: 5px;">
+                <div style="width: 8px; height: 8px; background: var(--accent-success); border-radius: 50%;"></div> System Online
+            </div>
+        </div>
+    </aside>
+
+    <main>
+        <header>
+            <div class="header-title">
+                <h1>Overview</h1>
+                <span id="full-date">Loading...</span>
+            </div>
+
+            <div class="header-actions">
+                <div class="datetime-pill">
+                    <i class="ph ph-clock"></i>
+                    <span id="digital-clock">00:00:00</span>
+                </div>
+                
+                <button class="icon-btn" onclick="toggleTheme()">
+                    <i class="ph ph-moon" id="theme-icon"></i>
+                </button>
+                
+                <button class="icon-btn" onclick="document.getElementById('sidebar').classList.toggle('open')" style="display: none;">
+                    <i class="ph ph-list"></i>
+                </button>
+            </div>
+        </header>
+
+        <div class="dashboard-container">
+            
+            <div class="kpi-grid">
+                <div class="kpi-card">
+                    <div class="kpi-header">
+                        <span class="kpi-title">Solar Power</span>
+                        <div class="kpi-icon"><i class="ph ph-lightning"></i></div>
+                    </div>
+                    <div class="kpi-value" id="val-power">--</div>
+                    <div class="kpi-sub trend-up">
+                        <i class="ph ph-trend-up"></i> +2.4% from avg
+                    </div>
+                </div>
+
+                <div class="kpi-card">
+                    <div class="kpi-header">
+                        <span class="kpi-title">System Voltage</span>
+                        <div class="kpi-icon"><i class="ph ph-plug"></i></div>
+                    </div>
+                    <div class="kpi-value" id="val-volt">--</div>
+                    <div class="kpi-sub">
+                        <span style="color: var(--text-muted)">Nominal Range</span>
+                    </div>
+                </div>
+
+                <div class="kpi-card">
+                    <div class="kpi-header">
+                        <span class="kpi-title">Current Flow</span>
+                        <div class="kpi-icon"><i class="ph ph-wave-sine"></i></div>
+                    </div>
+                    <div class="kpi-value" id="val-curr">--</div>
+                    <div class="kpi-sub trend-down">
+                        <i class="ph ph-trend-down"></i> Stable
+                    </div>
+                </div>
+
+                <div class="kpi-card">
+                    <div class="kpi-header">
+                        <span class="kpi-title">Panel Temp</span>
+                        <div class="kpi-icon"><i class="ph ph-thermometer"></i></div>
+                    </div>
+                    <div class="kpi-value" id="val-temp">--</div>
+                    <div class="kpi-sub">
+                        <span style="color: var(--accent-warning)">Monitor Alert > 45°C</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="charts-row">
+                <div class="chart-box">
+                    <div class="chart-header">
+                        <div class="chart-title">
+                            <h3>Performance Trends</h3>
+                            <p>Real-time Power Output (Watts)</p>
+                        </div>
+                    </div>
+                    <div class="chart-canvas-wrapper">
+                        <canvas id="mainChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="chart-box">
+                    <div class="chart-header">
+                        <div class="chart-title">
+                            <h3>Energy Distribution</h3>
+                            <p>Load Source Analysis</p>
+                        </div>
+                    </div>
+                    <div class="chart-canvas-wrapper">
+                        <canvas id="pieChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <footer>
+            <p><strong>Project:</strong> IoT Solar Monitoring System • Dep. of Electronics & Computer Engineering</p>
+            <p>&copy; 2026 ERC, Dharan. Developed by Project Team.</p>
+        </footer>
+    </main>
+
+    <script>
+        // --- CONSTANTS ---
+        const API_URL = 'https://yourdomain.com/getdata.php'; 
+        const MAX_POINTS = 15;
+
+        // --- STATE ---
+        let mainChart, pieChart;
+        let isLightMode = false;
+
+        // --- INITIALIZATION ---
+        document.addEventListener('DOMContentLoaded', () => {
+            initTime();
+            initCharts();
+            setInterval(fetchData, 2000); // Live update
+            fetchData(); // Immediate run
+        });
+
+        // --- TIME & DATE ---
+        function initTime() {
+            const update = () => {
+                const now = new Date();
+                document.getElementById('digital-clock').innerText = now.toLocaleTimeString('en-US', {hour12:true});
+                document.getElementById('full-date').innerText = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+            };
+            setInterval(update, 1000);
+            update();
+        }
+
+        // --- CHARTS SETUP ---
+        function initCharts() {
+            // 1. Line/Bar Combo Chart (Main)
+            const ctxMain = document.getElementById('mainChart').getContext('2d');
+            const gradient = ctxMain.createLinearGradient(0, 0, 0, 400);
+            gradient.addColorStop(0, 'rgba(59, 130, 246, 0.5)'); // Blue fade
+            gradient.addColorStop(1, 'rgba(59, 130, 246, 0)');
+
+            mainChart = new Chart(ctxMain, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Power (W)',
+                        data: [],
+                        borderColor: '#3b82f6',
+                        backgroundColor: gradient,
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 0,
+                        pointHoverRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { grid: { display: false }, ticks: { color: '#9ca3af' } },
+                        y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9ca3af' } }
+                    },
+                    animation: { duration: 0 }
+                }
+            });
+
+            // 2. Doughnut Chart (Distribution)
+            const ctxPie = document.getElementById('pieChart').getContext('2d');
+            pieChart = new Chart(ctxPie, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Solar Direct', 'Battery', 'Grid'],
+                    datasets: [{
+                        data: [45, 25, 30], // Initial dummy distribution
+                        backgroundColor: ['#f59e0b', '#10b981', '#3b82f6'],
+                        borderWidth: 0,
+                        hoverOffset: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '70%',
+                    plugins: {
+                        legend: { position: 'bottom', labels: { color: '#9ca3af', usePointStyle: true } }
+                    }
+                }
+            });
+        }
+
+        // --- DATA LOGIC ---
+        async function fetchData() {
+            try {
+                const response = await fetch(API_URL);
+                if (!response.ok) throw new Error("Offline");
+                const json = await response.json();
+                updateUI(json[0]);
+            } catch (e) {
+                // Simulation Fallback
+                const simData = generateSimulatedData();
+                updateUI(simData);
+            }
+        }
+
+        function updateUI(data) {
+            // 1. Update KPI Cards
+            document.getElementById('val-power').innerText = data.power + " W";
+            document.getElementById('val-volt').innerText = data.voltage + " V";
+            document.getElementById('val-curr').innerText = data.current + " A";
+            document.getElementById('val-temp').innerText = data.temperature + " °C";
+
+            // 2. Update Sidebar Quick Stats
+            document.getElementById('sb-solar').innerText = (data.power / 1000).toFixed(2) + " kW";
+            document.getElementById('sb-load').innerText = ((parseFloat(data.power) * 0.8) / 1000).toFixed(2) + " kW"; // Simulated Load logic
+
+            // 3. Update Main Chart
+            const timeLabel = new Date().toLocaleTimeString('en-US', {hour12:false});
+            
+            mainChart.data.labels.push(timeLabel);
+            mainChart.data.datasets[0].data.push(data.power);
+            
+            if(mainChart.data.labels.length > MAX_POINTS) {
+                mainChart.data.labels.shift();
+                mainChart.data.datasets[0].data.shift();
+            }
+            mainChart.update('none');
+
+            // 4. Update Pie Chart (Simulate distribution changes slightly)
+            // Solar usually high during day, battery usage varies
+            const solarShare = Math.min(60, Math.max(20, parseFloat(data.power) / 10));
+            const batteryShare = 30;
+            const gridShare = 100 - solarShare - batteryShare;
+            
+            pieChart.data.datasets[0].data = [solarShare, batteryShare, gridShare];
+            pieChart.update('none');
+        }
+
+        // --- SIMULATION ---
+        let sim = { v: 12.0, i: 5.0, t: 30 };
+        function generateSimulatedData() {
+            sim.v = 12 + Math.random();
+            sim.i = 5 + (Math.random() - 0.5) * 2;
+            let power = (sim.v * sim.i).toFixed(1);
+            
+            return {
+                power: power,
+                voltage: sim.v.toFixed(1),
+                current: sim.i.toFixed(2),
+                temperature: (25 + Math.random() * 5).toFixed(1),
+                humidity: 60,
+                light: 80
+            };
+        }
+
+        // --- THEME TOGGLE ---
+        function toggleTheme() {
+            document.body.classList.toggle('light-mode');
+            isLightMode = !isLightMode;
+            
+            const icon = document.getElementById('theme-icon');
+            if(isLightMode) {
+                icon.classList.replace('ph-moon', 'ph-sun');
+                Chart.defaults.color = '#374151';
+                Chart.defaults.borderColor = '#e5e7eb';
+            } else {
+                icon.classList.replace('ph-sun', 'ph-moon');
+                Chart.defaults.color = '#9ca3af';
+                Chart.defaults.borderColor = 'rgba(255,255,255,0.05)';
+            }
+            mainChart.update();
+            pieChart.update();
+        }
+    </script>
+</body>
+</html>
